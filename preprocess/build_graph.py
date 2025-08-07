@@ -18,33 +18,8 @@ def build_graph(sample: Dict) -> List[HeteroData]:
     vms = input_data["raw_vms"]
     connections = input_data["connections"]
 
-    # 创建 id 到 index 的映射，产生每个对象实体的索引号
-    # 由于这个产生索引号的步骤和后面输入特征的步骤都来源于同一个enumerate，所以顺序一定相同，可以保证
-    terminal_id_map = {t["terminal_id"]: i for i, t in enumerate(terminals)}
-    vm_id_map = {v["vm_id"]: i for i, v in enumerate(vms)}
-
-    # 准备 terminal / vm 特征
-    # 这里无论是否涉及到全部的边，只要存在一条连接，都把所有的终端特征、虚拟机特征送进去了
-    terminal_feats = []
-    for t in terminals:
-        terminal_feats.append([
-            float(t.get("terminalType", 0)),
-            float(t.get("userDiff", 0)),
-        ])
-    terminal_x = torch.tensor(terminal_feats, dtype=torch.float)
-
-    vm_feats = []
-    for v in vms:
-        vm_feats.append([
-            float(v.get("VMOsAllow", 0)),
-            float(v.get("VMOsVersionAllow", 0)),
-            float(v.get("CPU", 0)),
-            float(v.get("mem", 0)),
-            float(v.get("VMConnectionUser", 0)),
-            float(v.get("VMLoginTotal") or 0),
-            float(v.get("VMLoginSucceed") or 0),
-        ])
-    vm_x = torch.tensor(vm_feats, dtype=torch.float)
+    terminals_indexed_by_id = {terminal['terminal_id']: terminal for terminal in terminals}
+    vms_indexed_by_id = {vm['vm_id']: vm for vm in vms}
 
     # 按用户构图
     user_graphs = []
@@ -73,6 +48,37 @@ def build_graph(sample: Dict) -> List[HeteroData]:
             data["user"].y = user_label
             user_graphs.append(data)
             continue
+        
+        # 根据连接情况，列出参与建图的terminal, vm之id列表，并建立id和张量索引的关系
+        involved_terminal_ids = set(c['terminal_id'] for c in connections)
+        involved_vm_ids = set(c['vm_id'] for c in connections)
+        terminal_id_index_map = {terminal_id: i for i, terminal_id in enumerate(involved_terminal_ids)}
+        vm_id_index_map = {vm_id: i for i, vm_id in enumerate(involved_vm_ids)}
+
+        # 根据上面的id名单正式导入terminal和vm特征
+        # 和原本一样，这里产生索引号和输入特征的顺序都来源于相同的enumerate，因此可以保证顺序相同
+        terminal_feats = []
+        for tid in involved_terminal_ids:
+            t = terminals_indexed_by_id[tid]
+            terminal_feats.append([
+                float(t.get("terminalType", 0)),
+                float(t.get("userDiff", 0)),
+            ])
+        terminal_x = torch.tensor(terminal_feats, dtype=torch.float)
+
+        vm_feats = []
+        for vid in involved_vm_ids:
+            v = vms_indexed_by_id[vid]
+            vm_feats.append([
+                float(v.get("VMOsAllow", 0)),
+                float(v.get("VMOsVersionAllow", 0)),
+                float(v.get("CPU", 0)),
+                float(v.get("mem", 0)),
+                float(v.get("VMConnectionUser", 0)),
+                float(v.get("VMLoginTotal") or 0),
+                float(v.get("VMLoginSucceed") or 0),
+            ])
+        vm_x = torch.tensor(vm_feats, dtype=torch.float)
 
         # terminal ↔ vm 边，直接引入连接的两个特征
         # 当然首先要把 terminal_id 和 vm_id 转换成输入张量中的 terminal 和 vm 索引号
@@ -80,9 +86,9 @@ def build_graph(sample: Dict) -> List[HeteroData]:
         tv_attrs = []
         for c in u_conns:
             t_id, v_id = c["terminal_id"], c["vm_id"]
-            if t_id in terminal_id_map and v_id in vm_id_map:
-                t_idx = terminal_id_map[t_id]
-                v_idx = vm_id_map[v_id]
+            if t_id in terminal_id_index_map and v_id in vm_id_index_map:
+                t_idx = terminal_id_index_map[t_id]
+                v_idx = vm_id_index_map[v_id]
                 tv_edges.append([t_idx, v_idx])
                 tv_attrs.append([float(c.get("onlineTime") or 0), float(c.get("alertNum") or 0)])
 
@@ -99,9 +105,9 @@ def build_graph(sample: Dict) -> List[HeteroData]:
         ut_edges = []
         ut_attrs = []
         for t_id, aggregated_feat in ut_aggregated_feat.items():
-            if t_id not in terminal_id_map:
+            if t_id not in terminal_id_index_map:
                 continue
-            t_idx = terminal_id_map[t_id]
+            t_idx = terminal_id_index_map[t_id]
             ut_edges.append([0, t_idx])  # 用户节点索引为0（单节点）
             ut_attrs.append([aggregated_feat["onlineTime"], aggregated_feat["alertNum"]])
 
@@ -121,4 +127,3 @@ def build_graph(sample: Dict) -> List[HeteroData]:
         user_graphs.append(data)
 
     return user_graphs
-
