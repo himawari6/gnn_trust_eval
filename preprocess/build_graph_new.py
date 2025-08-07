@@ -127,4 +127,3 @@ def build_graph_new(sample: Dict) -> List[HeteroData]:
         user_graphs.append(data)
 
     return user_graphs
-
