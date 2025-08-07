@@ -28,14 +28,14 @@ def build_graph(sample: Dict) -> List[HeteroData]:
 
         # --- 构造当前用户子图 ---
         user_feat = torch.tensor([[
-            int(user.get("userType", 0)),
-            float(user.get("loginTotal", 0)),
-            float(user.get("loginSucceed", 0)),
-            float(user.get("ifLoginTimeOK", 1)),
-            float(user.get("loginTimeBias") or 0.0),
-            float(user.get("loginTimeDiff") or 0.0),
-            float(user.get("ifIpAllow", 1)),
-            float(user.get("ifAreaAllow") or 1),
+            int(user.get("user_type", 0)),
+            float(user.get("login_total", 0)),
+            float(user.get("login_succeed", 0)),
+            float(user.get("if_login_time_ok", 1)),
+            float(user.get("login_time_bias") or 0.0),
+            float(user.get("login_time_diff") or 0.0),
+            float(user.get("if_ip_allow", 1)),
+            float(user.get("if_area_allow") or 1),
         ]], dtype=torch.float)
 
         user_label = torch.tensor([LABEL_MAP[label_dict.get(u_id, "允许访问")]], dtype=torch.long)
@@ -61,8 +61,8 @@ def build_graph(sample: Dict) -> List[HeteroData]:
         for tid in involved_terminal_ids:
             t = terminals_indexed_by_id[tid]
             terminal_feats.append([
-                float(t.get("terminalType", 1)),
-                float(t.get("userDiff", 1)),
+                float(t.get("terminal_type", 1)),
+                float(t.get("user_diff", 1)),
             ])
         terminal_x = torch.tensor(terminal_feats, dtype=torch.float)
 
@@ -70,13 +70,13 @@ def build_graph(sample: Dict) -> List[HeteroData]:
         for vid in involved_vm_ids:
             v = vms_indexed_by_id[vid]
             vm_feats.append([
-                float(v.get("VMOsAllow", 1)),
-                float(v.get("VMOsVersionAllow", 1)),
-                float(v.get("CPU", 1)),
+                float(v.get("vm_os_allow", 1)),
+                float(v.get("vm_os_version_allow", 1)),
+                float(v.get("cpu", 1)),
                 float(v.get("mem", 1)),
-                float(v.get("VMConnectionUser", 0)),
-                float(v.get("VMLoginTotal") or 0),
-                float(v.get("VMLoginSucceed") or 0),
+                float(v.get("vm_connection_user", 0)),
+                float(v.get("vm_login_total") or 0),
+                float(v.get("vm_login_succeed") or 0),
             ])
         vm_x = torch.tensor(vm_feats, dtype=torch.float)
 
@@ -90,15 +90,15 @@ def build_graph(sample: Dict) -> List[HeteroData]:
                 t_idx = terminal_id_index_map[t_id]
                 v_idx = vm_id_index_map[v_id]
                 tv_edges.append([t_idx, v_idx])
-                tv_attrs.append([float(c.get("onlineTime") or 0), float(c.get("alertNum") or 0)])
+                tv_attrs.append([float(c.get("online_time") or 0), float(c.get("alert_num") or 0)])
 
         # user ↔ terminal 边（聚合），得到该用户对应不同终端的总连接时间和警报数
         ut_edge_aggregated_feat = {}
         for c in u_conns:
             key = c["terminal_id"]
-            ut_edge_aggregated_feat.setdefault(key, {"onlineTime": 0, "alertNum": 0})
-            ut_edge_aggregated_feat[key]["onlineTime"] += float(c.get("onlineTime") or 0)
-            ut_edge_aggregated_feat[key]["alertNum"] += float(c.get("alertNum") or 0)
+            ut_edge_aggregated_feat.setdefault(key, {"online_time": 0, "alert_num": 0})
+            ut_edge_aggregated_feat[key]["online_time"] += float(c.get("online_time") or 0)
+            ut_edge_aggregated_feat[key]["alert_num"] += float(c.get("alert_num") or 0)
 
         # terminal ↔ vm 边，使用上面聚合出来的“新边”
         # 当然首先要把 user_id 和 terminal_id 转换成输入张量中的 user 和 terminal 索引号
@@ -109,7 +109,7 @@ def build_graph(sample: Dict) -> List[HeteroData]:
                 continue
             t_idx = terminal_id_index_map[t_id]
             ut_edges.append([0, t_idx])  # 用户节点索引为0（单节点）
-            ut_attrs.append([feat["onlineTime"], feat["alertNum"]])
+            ut_attrs.append([feat["online_time"], feat["alert_num"]])
 
         # --- 构造图 ---
         data = HeteroData()

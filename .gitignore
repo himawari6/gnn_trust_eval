@@ -2,3 +2,4 @@
 **/graph/*.pt
 **/sample/*.json
 __pycache__
+*.sql
