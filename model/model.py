@@ -6,21 +6,26 @@ from model.modules import VMToTerminalLayer, TerminalToUserLayer
 class HeteroTrustGNN(nn.Module):
     def __init__(self, 
                  vm_in_dim=7, term_in_dim=2, user_in_dim=8, 
-                 edge_dim=2, hidden_dim=32, num_classes=3):
+                 edge_dim=2, user_out_dim=8, hidden_dim=32, num_classes=3):
         super().__init__()
 
         self.vm_to_term = VMToTerminalLayer(vm_in_dim, edge_dim, term_in_dim, hidden_dim)
-        self.term_to_user = TerminalToUserLayer(hidden_dim, edge_dim, user_in_dim, hidden_dim)
+        self.term_to_user = TerminalToUserLayer(hidden_dim, edge_dim, user_in_dim, hidden_dim, user_out_dim)
         self.classifier = nn.Sequential(
-            nn.Linear(hidden_dim, hidden_dim),
+            nn.Linear(user_out_dim, hidden_dim),
             nn.ReLU(),
             nn.Linear(hidden_dim, num_classes)
         )
 
     def forward(self, data):
-        vm_x = data["vm"].x
-        term_x = data["terminal"].x
         user_x = data["user"].x
+
+        if ('terminal' not in data.node_types or 'vm' not in data.node_types):
+            out = self.classifier(user_x)  # shape: [1, num_classes]
+            return out
+
+        term_x = data["terminal"].x
+        vm_x = data["vm"].x
 
         # VM -> Terminal 聚合
         term_x_updated = self.vm_to_term(

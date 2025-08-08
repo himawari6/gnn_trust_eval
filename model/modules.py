@@ -26,10 +26,12 @@ class VMToTerminalLayer(nn.Module):
         return agg_messages
 
 class TerminalToUserLayer(nn.Module):
-    def __init__(self, term_dim, edge_dim, user_dim, hidden_dim):
+    def __init__(self, term_dim, edge_dim, user_in_dim, hidden_dim, user_out_dim):
         super().__init__()
         self.mlp = nn.Sequential(
-            nn.Linear(term_dim + edge_dim + user_dim, hidden_dim),
+            nn.Linear(term_dim + edge_dim + user_in_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, user_out_dim),
             nn.ReLU()
         )
 
