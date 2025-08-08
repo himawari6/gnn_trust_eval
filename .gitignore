@@ -1,5 +1,5 @@
 .vscode
-**/graph/*.pt
-**/sample/*.json
+*.pt
+*.json
 __pycache__
 *.sql

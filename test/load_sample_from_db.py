@@ -1,6 +1,6 @@
 import json
 from datetime import datetime
-from data.db.db_sample_collector import get_features_from_db
+from data.operations.db_sample_collector import get_features_from_db
 
 if __name__ == '__main__':
     sample = get_features_from_db()
