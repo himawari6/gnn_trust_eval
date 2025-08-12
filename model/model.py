@@ -9,7 +9,7 @@ class HeteroTrustGNN(nn.Module):
                  edge_dim=2, user_hidden_dim=32, terminal_hidden_dim=8, vm_hidden_dim=32, 
                  num_layers=2, num_classes=3):
         """
-        hidden_dim: 每个节点/边投影到的统一维度
+        hidden_dim: 投影到的维度
         num_layers: 重复的层数（每层包含 VM->T 和 T->U）
         """
         super().__init__()
