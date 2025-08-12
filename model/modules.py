@@ -1,50 +1,70 @@
 import torch
 import torch.nn as nn
-import torch_scatter
+from torch_scatter import scatter_mean
 
 class VMToTerminalLayer(nn.Module):
-    def __init__(self, vm_dim, edge_dim, terminal_dim, hidden_dim):
+    """
+    一个消息生成器：VM -> Terminal
+    输入：vm_x (N_vm, H), term_x (N_term, H), edge_index (2, E) 其中 edge_index[0]=term_idx, edge_index[1]=vm_idx
+          edge_attr (E, edge_dim)
+    输出：agg_messages -> (N_term, H)
+    """
+    def __init__(self, hidden_dim, edge_dim):
         super().__init__()
+        # 输入维度： vm(H) + edge(edge_dim) + term(H)
         self.mlp = nn.Sequential(
-            nn.Linear(vm_dim + edge_dim + terminal_dim, hidden_dim),
+            nn.Linear(hidden_dim + edge_dim + hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU()
         )
 
-    # 输入：
     def forward(self, vm_x, term_x, edge_index, edge_attr):
-        src, dst = edge_index  # src: Terminal idx, dst: VM idx
+        # edge_index: [2, E], 约定为 [term_idx, vm_idx]
+        term_idx = edge_index[0]
+        vm_idx = edge_index[1]
 
-        vm_feat = vm_x[dst]
-        term_feat = term_x[src]
-        edge_feat = edge_attr
+        vm_feat = vm_x[vm_idx]          # (E, H)
+        term_feat = term_x[term_idx]    # (E, H)
+        edge_feat = edge_attr           # (E, edge_dim)
 
-        message_input = torch.cat([vm_feat, edge_feat, term_feat], dim=1)
-        messages = self.mlp(message_input)
+        message_input = torch.cat([vm_feat, edge_feat, term_feat], dim=1)  # (E, 2H+edge_dim)
+        messages = self.mlp(message_input)  # (E, H)
 
-        # 聚合多个 VM → 同一个 Terminal
-        agg_messages = torch_scatter.scatter_mean(messages, src, dim=0, dim_size=term_x.size(0))
-        return agg_messages
+        # 聚合到 term 节点（可能有多个消息到同一个 term）
+        agg = scatter_mean(messages, term_idx, dim=0, dim_size=term_x.size(0))  # (N_term, H)
+        return agg
+
 
 class TerminalToUserLayer(nn.Module):
-    def __init__(self, term_dim, edge_dim, user_in_dim, hidden_dim, user_out_dim):
+    """
+    Terminal -> User 聚合层
+    输入：term_x (N_term, H), user_x (N_user, H), edge_index (2, E2) 约定为 [user_idx, term_idx]
+    输出：agg_messages -> (N_user, H)
+    """
+    def __init__(self, hidden_dim, edge_dim):
         super().__init__()
+        # 输入维度： term(H) + edge(edge_dim) + user(H)
         self.mlp = nn.Sequential(
-            nn.Linear(term_dim + edge_dim + user_in_dim, hidden_dim),
+            nn.Linear(hidden_dim + edge_dim + hidden_dim, hidden_dim),
             nn.ReLU(),
-            nn.Linear(hidden_dim, user_out_dim),
+            nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU()
         )
 
     def forward(self, term_x, user_x, edge_index, edge_attr):
-        src, dst = edge_index  # src: User idx (always 0), dst: Terminal idx
+        # edge_index: [2, E], 约定为 [user_idx, term_idx]
+        user_idx = edge_index[0]
+        term_idx = edge_index[1]
 
-        term_feat = term_x[dst]
-        user_feat = user_x[src]
-        edge_feat = edge_attr
+        term_feat = term_x[term_idx]    # (E, H)
+        user_feat = user_x[user_idx]    # (E, H)
+        edge_feat = edge_attr           # (E, edge_dim)
 
-        message_input = torch.cat([term_feat, edge_feat, user_feat], dim=1)
-        messages = self.mlp(message_input)
+        message_input = torch.cat([term_feat, edge_feat, user_feat], dim=1)  # (E, 2H+edge_dim)
+        messages = self.mlp(message_input)  # (E, H)
 
-        # 所有 Terminal → 聚合成一个用户嵌入（只有一个用户）
-        agg_messages = torch_scatter.scatter_mean(messages, src, dim=0, dim_size=user_x.size(0))
-        return agg_messages
+        # 聚合到 user 节点（通常每个图 user 数量小，常为1）
+        agg = scatter_mean(messages, user_idx, dim=0, dim_size=user_x.size(0))  # (N_user, H)
+        return agg
+
