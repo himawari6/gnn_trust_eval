@@ -6,35 +6,37 @@ from model.modules import VMToTerminalLayer, TerminalToUserLayer
 class HeteroTrustGNN(nn.Module):
     def __init__(self,
                  vm_in_dim=7, term_in_dim=2, user_in_dim=8,
-                 edge_dim=2, hidden_dim=64,
+                 edge_dim=2, user_hidden_dim=32, terminal_hidden_dim=8, vm_hidden_dim=32, 
                  num_layers=2, num_classes=3):
         """
         hidden_dim: 每个节点/边投影到的统一维度
         num_layers: 重复的层数（每层包含 VM->T 和 T->U）
         """
         super().__init__()
-        self.hidden_dim = hidden_dim
+        self.user_hidden_dim = user_hidden_dim
+        self.terminal_hidden_dim = terminal_hidden_dim
+        self.vm_hidden_dim = vm_hidden_dim
         self.num_layers = num_layers
         self.num_classes = num_classes
 
         # 投影层：把原始特征投影到 hidden_dim
-        self.vm_proj = nn.Linear(vm_in_dim, hidden_dim)
-        self.term_proj = nn.Linear(term_in_dim, hidden_dim)
-        self.user_proj = nn.Linear(user_in_dim, hidden_dim)
+        self.vm_proj = nn.Linear(vm_in_dim, vm_hidden_dim)
+        self.term_proj = nn.Linear(term_in_dim, terminal_hidden_dim)
+        self.user_proj = nn.Linear(user_in_dim, user_hidden_dim)
 
         # 构造重复的层
         self.vm_to_term_layers = nn.ModuleList([
-            VMToTerminalLayer(hidden_dim, edge_dim) for _ in range(num_layers)
+            VMToTerminalLayer(vm_hidden_dim, terminal_hidden_dim, edge_dim) for _ in range(num_layers)
         ])
         self.term_to_user_layers = nn.ModuleList([
-            TerminalToUserLayer(hidden_dim, edge_dim) for _ in range(num_layers)
+            TerminalToUserLayer(terminal_hidden_dim, user_hidden_dim, edge_dim) for _ in range(num_layers)
         ])
 
         # 最后的分类器（把 user_hidden -> logits）
         self.classifier = nn.Sequential(
-            nn.Linear(hidden_dim, hidden_dim),
+            nn.Linear(user_hidden_dim, user_hidden_dim),
             nn.ReLU(),
-            nn.Linear(hidden_dim, num_classes)
+            nn.Linear(user_hidden_dim, num_classes)
         )
 
     def forward(self, data):

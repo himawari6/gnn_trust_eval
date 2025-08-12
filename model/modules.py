@@ -9,13 +9,13 @@ class VMToTerminalLayer(nn.Module):
           edge_attr (E, edge_dim)
     输出：agg_messages -> (N_term, H)
     """
-    def __init__(self, hidden_dim, edge_dim):
+    def __init__(self, vm_hidden_dim, terminal_hidden_dim, edge_dim):
         super().__init__()
         # 输入维度： vm(H) + edge(edge_dim) + term(H)
         self.mlp = nn.Sequential(
-            nn.Linear(hidden_dim + edge_dim + hidden_dim, hidden_dim),
+            nn.Linear(vm_hidden_dim + edge_dim + terminal_hidden_dim, vm_hidden_dim),
             nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim),
+            nn.Linear(vm_hidden_dim, terminal_hidden_dim),
             nn.ReLU()
         )
 
@@ -42,13 +42,13 @@ class TerminalToUserLayer(nn.Module):
     输入：term_x (N_term, H), user_x (N_user, H), edge_index (2, E2) 约定为 [user_idx, term_idx]
     输出：agg_messages -> (N_user, H)
     """
-    def __init__(self, hidden_dim, edge_dim):
+    def __init__(self, terminal_hidden_dim, user_hidden_dim, edge_dim):
         super().__init__()
         # 输入维度： term(H) + edge(edge_dim) + user(H)
         self.mlp = nn.Sequential(
-            nn.Linear(hidden_dim + edge_dim + hidden_dim, hidden_dim),
+            nn.Linear(terminal_hidden_dim + edge_dim + user_hidden_dim, user_hidden_dim),
             nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim),
+            nn.Linear(user_hidden_dim, user_hidden_dim),
             nn.ReLU()
         )
 
