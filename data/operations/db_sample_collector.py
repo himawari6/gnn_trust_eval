@@ -1,4 +1,6 @@
 import pymysql
+import json
+from datetime import datetime
 from config.config import DB_CONFIG
 
 def get_features_from_db():
@@ -8,30 +10,21 @@ def get_features_from_db():
     try:
         # 用户：保留每个 userId 的最新记录
         cursor.execute("""
-            SELECT * FROM user_feature uf
-            WHERE uf.id = (
-                SELECT MAX(id) FROM user_feature WHERE userId = uf.userId
-            )
+            SELECT * FROM user_feature ORDER BY `id` DESC LIMIT 3
         """)
         user_records = cursor.fetchall()
         
 
         # 终端：保留每个 terminalId 的最新记录
         cursor.execute("""
-            SELECT * FROM terminal_feature tf
-            WHERE tf.id = (
-                SELECT MAX(id) FROM terminal_feature WHERE terminalId = tf.terminalId
-            )
+            SELECT * FROM terminal_feature ORDER BY `id` DESC LIMIT 2
         """)
         terminal_records = cursor.fetchall()
         
 
         # 虚拟机：保留每个 resourceId 的最新记录
         cursor.execute("""
-            SELECT * FROM vm_feature vf
-            WHERE vf.id = (
-                SELECT MAX(id) FROM vm_feature WHERE resourceId = vf.resourceId
-            )
+            SELECT * FROM vm_feature ORDER BY `id` DESC LIMIT 2
         """)
         vm_records = cursor.fetchall()
         
@@ -103,5 +96,9 @@ def get_features_from_db():
     finally:
         cursor.close()
         conn.close()
+
+    current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+    with open(f"data/sample/sample_{current_time}.json", "w", encoding="utf-8") as f:
+        json.dump([sample], f, ensure_ascii=False, indent=4)
 
     return sample

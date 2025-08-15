@@ -54,7 +54,8 @@ class HeteroTrustGNN(nn.Module):
         """
         # If node types missing, fallback: just classify user features
         if ('terminal' not in data.node_types) or ('vm' not in data.node_types):
-            return self.classifier(data['user'].x)
+            user_x = self.user_proj(data['user'].x)     # (N_user, H)
+            return self.classifier(user_x)
 
         # initial projection
         vm_x = self.vm_proj(data['vm'].x)           # (N_vm, H)

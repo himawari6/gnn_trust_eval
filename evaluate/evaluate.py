@@ -14,7 +14,7 @@ def load_graph_dataset(pt_files):
         dataset.extend(data_list)
     return dataset
 
-test_files = ["test_sample_01.pt"]  # 测试数据
+test_files = ["data\graph\sample_1.pt"]  # 测试数据
 test_dataset = load_graph_dataset(test_files)
 test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 
@@ -34,7 +34,7 @@ model = HeteroTrustGNN(
     num_classes=3
 ).to(device)
 
-model_path = "result/train/model/trust_gnn_model.pth"
+model_path = "result/train/model/trust_gnn_model20250812_190906.pth"
 if not os.path.exists(model_path):
     raise FileNotFoundError(f"找不到模型文件 {model_path}，请先运行 train.py")
 

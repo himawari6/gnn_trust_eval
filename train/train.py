@@ -17,7 +17,7 @@ def load_graph_dataset(pt_files):
         dataset.extend(data_list)
     return dataset
 
-train_files = ["train_sample_01.pt", "train_sample_02.pt"]  # 训练数据
+train_files = ["data\graph\sample_1.pt"]  # 训练数据
 train_dataset = load_graph_dataset(train_files)
 train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True)
 
@@ -78,8 +78,8 @@ def train_model(num_epochs=20):
     plt.title('Training Loss Curve')
     plt.grid(True)
     plt.tight_layout()
-    plt.savefig(f"loss_curve_of_model_at_{current_time}.png", dpi=150)
+    plt.savefig(f"result/train/figures/loss_curve_of_model_at_{current_time}.png")
     plt.show()
 
 if __name__ == "__main__":
-    train_model(num_epochs=1)
+    train_model(num_epochs=100)
