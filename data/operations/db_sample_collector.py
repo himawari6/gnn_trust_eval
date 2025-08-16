@@ -88,7 +88,10 @@ def get_features_from_db():
             },
             "output": {
                 "labels": {
-                    user_record["userId"]: "允许访问" for user_record in user_records
+                    # user_record["userId"]: "允许访问" for user_record in user_records
+                    "ff808081980bb4a301980d2e36970004": "允许访问",
+                    "ff80808197ce5b190197ce5d6d8f0007": "二次身份认证",
+                    "1": "允许访问"
                 }
             }
         }
