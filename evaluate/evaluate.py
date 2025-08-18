@@ -3,6 +3,7 @@ from torch_geometric.loader import DataLoader
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, classification_report
 from model.model import HeteroTrustGNN  # 你的模型
 import os
+from utils.logger import get_logger
 
 # ---------------------------
 # 加载数据
@@ -14,9 +15,11 @@ def load_graph_dataset(pt_files):
         dataset.extend(data_list)
     return dataset
 
-test_files = ["data\graph\sample_1.pt"]  # 测试数据
+test_files = ["data/graph/evaluate_samples.pt"]  # 测试数据
 test_dataset = load_graph_dataset(test_files)
 test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
+
+logger = get_logger(log_dir="log", log_name="GNN_evaluate")
 
 # ---------------------------
 # 初始化模型并加载权重
@@ -34,7 +37,7 @@ model = HeteroTrustGNN(
     num_classes=3
 ).to(device)
 
-model_path = "result/train/model/trust_gnn_model20250812_190906.pth"
+model_path = "result\\train\\model\\trust_gnn_model20250818_115927.pth"
 if not os.path.exists(model_path):
     raise FileNotFoundError(f"找不到模型文件 {model_path}，请先运行 train.py")
 
@@ -62,8 +65,10 @@ precision = precision_score(all_labels, all_preds, average='macro', zero_divisio
 recall = recall_score(all_labels, all_preds, average='macro', zero_division=0)
 f1 = f1_score(all_labels, all_preds, average='macro', zero_division=0)
 
-print(f"Accuracy: {acc:.4f}")
-print(f"Precision: {precision:.4f}")
-print(f"Recall: {recall:.4f}")
-print(f"F1-score: {f1:.4f}")
-print("\nClassification Report:\n", classification_report(all_labels, all_preds, zero_division=0))
+logger.info(
+    f"Accuracy: {acc:.4f}\n"
+    f"Precision: {precision:.4f}\n"
+    f"Recall: {recall:.4f}\n"
+    f"F1-score: {f1:.4f}\n"
+)
+logger.info("Classification Report:\n", classification_report(all_labels, all_preds, zero_division=0))

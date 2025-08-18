@@ -1,11 +1,13 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch_geometric.loader import DataLoader
 import matplotlib.pyplot as plt
 from model.model import HeteroTrustGNN  # 你的模型
 import os
 from datetime import datetime
+from utils.logger import get_logger
 
 # ---------------------------
 # 加载数据
@@ -17,9 +19,11 @@ def load_graph_dataset(pt_files):
         dataset.extend(data_list)
     return dataset
 
-train_files = ["data\graph\sample_1.pt"]  # 训练数据
+train_files = ["data/graph/train_samples.pt"]  # 训练数据
 train_dataset = load_graph_dataset(train_files)
 train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True)
+
+logger = get_logger(log_dir="log", log_name="GNN_train")
 
 # ---------------------------
 # 初始化模型
@@ -38,7 +42,8 @@ model = HeteroTrustGNN(
 ).to(device)
 
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters(), lr=0.001)
+optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
+scheduler = CosineAnnealingLR(optimizer, T_max=20, eta_min=1e-5)
 
 # ---------------------------
 # 训练
@@ -59,16 +64,22 @@ def train_model(num_epochs=20):
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
+            
+        scheduler.step()
 
         avg_loss = total_loss / len(train_loader)
         loss_history.append(avg_loss)
-        print(f"Epoch {epoch+1}/{num_epochs}, Loss: {avg_loss:.4f}")
+        logger.info(
+            f"Epoch {epoch+1}/{num_epochs},"
+            f"Loss: {avg_loss:.4f},"
+            f"LR={scheduler.get_last_lr()[0]:.6f}"
+        )
 
     # 保存模型
     current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
     model_path = f"result/train/model/trust_gnn_model{current_time}.pth"
     torch.save(model.state_dict(), model_path)
-    print(f"模型已保存到 {os.path.abspath(model_path)}")
+    logger.info(f"模型已保存到 {os.path.abspath(model_path)}")
 
     # 绘制 loss 曲线
     plt.figure(figsize=(6, 4))
