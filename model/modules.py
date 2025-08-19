@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from torch_scatter import scatter_mean
+from torch_scatter import scatter_mean, scatter_sum
 
 class VMToTerminalLayer(nn.Module):
     """
@@ -32,7 +32,7 @@ class VMToTerminalLayer(nn.Module):
         messages = self.mlp(message_input)  # (E, H)
 
         # 聚合到 term 节点（可能有多个消息到同一个 term）
-        agg = scatter_mean(messages, term_idx, dim=0, dim_size=term_x.size(0))  # (N_term, H)
+        agg = scatter_sum(messages, term_idx, dim=0, dim_size=term_x.size(0))  # (N_term, H)
         return agg
 
 
@@ -65,6 +65,6 @@ class TerminalToUserLayer(nn.Module):
         messages = self.mlp(message_input)  # (E, H)
 
         # 聚合到 user 节点（通常每个图 user 数量小，常为1）
-        agg = scatter_mean(messages, user_idx, dim=0, dim_size=user_x.size(0))  # (N_user, H)
+        agg = scatter_sum(messages, user_idx, dim=0, dim_size=user_x.size(0))  # (N_user, H)
         return agg
 

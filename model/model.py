@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch_geometric.nn import global_mean_pool
 from model.modules import VMToTerminalLayer, TerminalToUserLayer
 
 class HeteroTrustGNN(nn.Module):
@@ -90,6 +91,9 @@ class HeteroTrustGNN(nn.Module):
             # 残差更新 user 节点
             user_x = user_x + agg_user
 
+
         # 最终分类（基于 user_x）
-        out = self.classifier(user_x)  # (N_user, num_classes)
+        # graph_embedding = global_mean_pool(user_x, data["user"].batch)
+        # out = self.classifier(graph_embedding)
+        out = self.classifier(user_x)
         return out

@@ -37,7 +37,7 @@ model = HeteroTrustGNN(
     num_classes=3
 ).to(device)
 
-model_path = "result\\train\\model\\trust_gnn_model20250818_115927.pth"
+model_path = "result\\train\\model\\trust_gnn_model20250819_103027.pth"
 if not os.path.exists(model_path):
     raise FileNotFoundError(f"找不到模型文件 {model_path}，请先运行 train.py")
 
@@ -65,10 +65,11 @@ precision = precision_score(all_labels, all_preds, average='macro', zero_divisio
 recall = recall_score(all_labels, all_preds, average='macro', zero_division=0)
 f1 = f1_score(all_labels, all_preds, average='macro', zero_division=0)
 
+logger.info(f'模型：{model_path}')
 logger.info(
-    f"Accuracy: {acc:.4f}\n"
-    f"Precision: {precision:.4f}\n"
-    f"Recall: {recall:.4f}\n"
-    f"F1-score: {f1:.4f}\n"
+    f"Accuracy: {acc:.4f}, "
+    f"Precision: {precision:.4f}, "
+    f"Recall: {recall:.4f}, "
+    f"F1-score: {f1:.4f}"
 )
-logger.info("Classification Report:\n", classification_report(all_labels, all_preds, zero_division=0))
+logger.info('\n' + classification_report(all_labels, all_preds, digits=4, zero_division=0))

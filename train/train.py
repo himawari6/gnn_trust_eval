@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.optim.lr_scheduler import CosineAnnealingLR
+from torch.optim.lr_scheduler import StepLR, ExponentialLR, CosineAnnealingLR
 from torch_geometric.loader import DataLoader
 import matplotlib.pyplot as plt
 from model.model import HeteroTrustGNN  # 你的模型
@@ -42,8 +42,9 @@ model = HeteroTrustGNN(
 ).to(device)
 
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
-scheduler = CosineAnnealingLR(optimizer, T_max=20, eta_min=1e-5)
+optimizer = optim.Adam(model.parameters(), lr=0.0005, weight_decay=1e-5)
+# scheduler = CosineAnnealingLR(optimizer, T_max=20, eta_min=1e-5)
+scheduler = ExponentialLR(optimizer, gamma=0.95)
 
 # ---------------------------
 # 训练
@@ -70,8 +71,8 @@ def train_model(num_epochs=20):
         avg_loss = total_loss / len(train_loader)
         loss_history.append(avg_loss)
         logger.info(
-            f"Epoch {epoch+1}/{num_epochs},"
-            f"Loss: {avg_loss:.4f},"
+            f"Epoch {epoch+1}/{num_epochs}, "
+            f"Loss: {avg_loss:.4f}, "
             f"LR={scheduler.get_last_lr()[0]:.6f}"
         )
 
