@@ -24,12 +24,13 @@ all_graphs = torch.load("data\graph\merged_sample_20250816_164358.pt")
 # for data in all_graphs:
 #     print(data['user'].x)
 
-# print(data)
-# print(data['user'])
-# print(data['terminal'])
-# print(data['vm'])
-# print(data['user', 'connects', 'terminal'])
-# print(data['terminal', 'connects', 'vm'])
+data = all_graphs[7]
+print(data)
+print(data['user'])
+print(data['terminal'])
+print(data['vm'])
+print(data['user', 'connects', 'terminal'])
+print(data['terminal', 'connects', 'vm'])
 
 # X, y = [], []
 # for g in all_graphs:
