@@ -93,7 +93,5 @@ class HeteroTrustGNN(nn.Module):
 
 
         # 最终分类（基于 user_x）
-        # graph_embedding = global_mean_pool(user_x, data["user"].batch)
-        # out = self.classifier(graph_embedding)
         out = self.classifier(user_x)
         return out

@@ -40,7 +40,7 @@ def build_graph(sample: Dict) -> List[HeteroData]:
 
         user_label = torch.tensor([LABEL_MAP[label_dict.get(u_id, "允许访问")]], dtype=torch.long)
 
-        # 获取该用户所有连接
+        # 获取该用户所有连接。如没有连接，则直接形成只有用户特征的图
         u_conns = [c for c in connections if c["user_id"] == u_id]
         if not u_conns:
             data = HeteroData()
