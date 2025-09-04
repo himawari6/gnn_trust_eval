@@ -89,7 +89,7 @@ def build_graph(sample: Dict) -> List[HeteroData]:
             if t_id in terminal_id_index_map and v_id in vm_id_index_map:
                 t_idx = terminal_id_index_map[t_id]
                 v_idx = vm_id_index_map[v_id]
-                tv_edges.append([t_idx, v_idx])
+                tv_edges.append([v_idx, t_idx])
                 tv_attrs.append([float(c.get("online_time") or 0), float(c.get("alert_num") or 0)])
 
         # user ↔ terminal 边（聚合），得到该用户对应不同终端的总连接时间和警报数
@@ -108,7 +108,7 @@ def build_graph(sample: Dict) -> List[HeteroData]:
             if t_id not in terminal_id_index_map:
                 continue
             t_idx = terminal_id_index_map[t_id]
-            ut_edges.append([0, t_idx])  # 用户节点索引为0（单节点）
+            ut_edges.append([t_idx, 0])  # 用户节点索引为0（单节点）
             ut_attrs.append([feat["online_time"], feat["alert_num"]])
 
         # --- 构造图 ---
@@ -118,11 +118,17 @@ def build_graph(sample: Dict) -> List[HeteroData]:
         data["terminal"].x = terminal_x
         data["vm"].x = vm_x
 
-        data["user", "connects", "terminal"].edge_index = torch.tensor(ut_edges, dtype=torch.long).t().contiguous()
-        data["user", "connects", "terminal"].edge_attr = torch.tensor(ut_attrs, dtype=torch.float)
+        # data["user", "connects", "terminal"].edge_index = torch.tensor(ut_edges, dtype=torch.long).t().contiguous()
+        # data["user", "connects", "terminal"].edge_attr = torch.tensor(ut_attrs, dtype=torch.float)
 
-        data["terminal", "connects", "vm"].edge_index = torch.tensor(tv_edges, dtype=torch.long).t().contiguous()
-        data["terminal", "connects", "vm"].edge_attr = torch.tensor(tv_attrs, dtype=torch.float)
+        # data["terminal", "connects", "vm"].edge_index = torch.tensor(tv_edges, dtype=torch.long).t().contiguous()
+        # data["terminal", "connects", "vm"].edge_attr = torch.tensor(tv_attrs, dtype=torch.float)
+
+        data["terminal", "used_by", "user"].edge_index = torch.tensor(ut_edges, dtype=torch.long).t().contiguous()
+        data["terminal", "used_by", "user"].edge_attr = torch.tensor(ut_attrs, dtype=torch.float)
+
+        data["vm", "accessed_by", "terminal"].edge_index = torch.tensor(tv_edges, dtype=torch.long).t().contiguous()
+        data["vm", "accessed_by", "terminal"].edge_attr = torch.tensor(tv_attrs, dtype=torch.float)
 
         user_graphs.append(data)
 

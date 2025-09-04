@@ -12,9 +12,10 @@ import numpy as np
 #     return dict(counter)
 
 # 加载图（从 pt 文件）
-all_graphs = torch.load("data\graph\merged_sample_20250816_164358.pt")
+# all_graphs = torch.load("data\graph\merged_sample_20250816_164358.pt")
 # train_graphs = torch.load("data/graph/train_samples.pt")
 # evaluate_graphs = torch.load("data/graph/test_samples.pt")
+data = torch.load("data/graph/toy.pt")
 
 # print(f"总样本数: {len(all_graphs)}")
 # print("训练集类别分布:", count_labels(train_graphs))
@@ -24,11 +25,11 @@ all_graphs = torch.load("data\graph\merged_sample_20250816_164358.pt")
 # for data in all_graphs:
 #     print(data['user'].x)
 
-data = all_graphs[7]
+# data = all_graphs[7]
 print(data)
-print(data['user'])
-print(data['terminal'])
-print(data['vm'])
+# print(data['user'])
+# print(data['terminal'])
+# print(data['vm'])
 print(data['user', 'connects', 'terminal'])
 print(data['terminal', 'connects', 'vm'])
 
