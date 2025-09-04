@@ -42,7 +42,7 @@ model = HeteroTrustGNN(
 ).to(device)
 
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters(), lr=0.0005, weight_decay=1e-5)
+optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
 # scheduler = CosineAnnealingLR(optimizer, T_max=20, eta_min=1e-5)
 scheduler = ExponentialLR(optimizer, gamma=0.95)
 

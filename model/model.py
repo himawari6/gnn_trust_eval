@@ -8,7 +8,7 @@ from model.modules import VMToTerminalLayer, TerminalToUserLayer
 class HeteroTrustGNN(nn.Module):
     def __init__(self,
                  vm_in_dim=7, term_in_dim=2, user_in_dim=8,
-                 edge_dim=2, user_hidden_dim=32, terminal_hidden_dim=8, vm_hidden_dim=32,
+                 edge_dim=2, user_hidden_dim=8, terminal_hidden_dim=8, vm_hidden_dim=8,
                  num_layers=2, num_classes=3):
         super().__init__()
         self.num_layers = num_layers
@@ -22,9 +22,9 @@ class HeteroTrustGNN(nn.Module):
         self.layers = nn.ModuleList()
         for _ in range(num_layers):
             conv = HeteroConv({
-                ('terminal', 'connects', 'vm'): VMToTerminalLayer(vm_hidden_dim, terminal_hidden_dim, edge_dim),
-                ('user', 'connects', 'terminal'): TerminalToUserLayer(terminal_hidden_dim, user_hidden_dim, edge_dim),
-            }, aggr='sum')
+                ('vm', 'accessed_by', 'terminal'): VMToTerminalLayer(vm_hidden_dim, terminal_hidden_dim, edge_dim),
+                ('terminal', 'used_by', 'user'): TerminalToUserLayer(terminal_hidden_dim, user_hidden_dim, edge_dim),
+            })
             self.layers.append(conv)
 
         # 分类器
@@ -35,19 +35,29 @@ class HeteroTrustGNN(nn.Module):
         )
 
     def forward(self, data: HeteroData):
+        if ('terminal' not in data.node_types) or ('vm' not in data.node_types):
+            user_x = self.user_proj(data['user'].x)
+            return self.classifier(user_x)
+        
         # 投影
-        x_dict = {
+        x = {
             'vm': self.vm_proj(data['vm'].x),
             'terminal': self.term_proj(data['terminal'].x),
             'user': self.user_proj(data['user'].x),
         }
 
+        edge_index = data.edge_index_dict
+        edge_attr = data.edge_attr_dict
+
         # 逐层 HeteroConv
+        # print(x_dict)
         for conv in self.layers:
-            x_dict = conv(x_dict, data.edge_index_dict, data.edge_attr_dict)
+            updated_x = conv(x, edge_index, edge_attr)
+            x = {**x, **updated_x}
+            # print(x_dict)
 
         # 基于 user 节点分类
-        out = self.classifier(x_dict['user'])
+        out = self.classifier(x['user'])
         return out
 
 

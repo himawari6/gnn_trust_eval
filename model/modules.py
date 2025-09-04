@@ -14,8 +14,7 @@ class VMToTerminalLayer(MessagePassing):
         )
 
     def forward(self, x, edge_index, edge_attr):
-        src_x, dst_x = x
-        return self.propagate(edge_index=edge_index, x=(src_x, dst_x), edge_attr=edge_attr)
+        return self.propagate(edge_index=edge_index, x=x, edge_attr=edge_attr)
 
     def message(self, x_j, x_i, edge_attr):
         # x_j: vm 的特征, x_i: terminal 的特征
@@ -23,8 +22,9 @@ class VMToTerminalLayer(MessagePassing):
         return self.mlp(msg_input)
 
     def update(self, aggr_out, x):
+        vm_x, terminal_x = x
         # 残差更新 terminal
-        return x + aggr_out
+        return terminal_x + aggr_out
 
 
 class TerminalToUserLayer(MessagePassing):
@@ -38,8 +38,7 @@ class TerminalToUserLayer(MessagePassing):
         )
 
     def forward(self, x, edge_index, edge_attr):
-        src_x, dst_x = x
-        return self.propagate(edge_index=edge_index, x=(src_x, dst_x), edge_attr=edge_attr)
+        return self.propagate(edge_index=edge_index, x=x, edge_attr=edge_attr)
 
     def message(self, x_j, x_i, edge_attr):
         # x_j: terminal 的特征, x_i: user 的特征
@@ -47,7 +46,8 @@ class TerminalToUserLayer(MessagePassing):
         return self.mlp(msg_input)
 
     def update(self, aggr_out, x):
-        return x + aggr_out
+        terminal_x, user_x = x
+        return user_x + aggr_out
 
 
 

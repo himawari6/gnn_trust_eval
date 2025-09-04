@@ -37,7 +37,7 @@ model = HeteroTrustGNN(
     num_classes=3
 ).to(device)
 
-model_path = "result\\train\\model\\trust_gnn_model20250819_103027.pth"
+model_path = "result\\train\\model\\trust_gnn_model20250904_180154.pth"
 if not os.path.exists(model_path):
     raise FileNotFoundError(f"找不到模型文件 {model_path}，请先运行 train.py")
 

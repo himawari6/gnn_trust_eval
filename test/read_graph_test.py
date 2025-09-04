@@ -30,8 +30,10 @@ print(data)
 # print(data['user'])
 # print(data['terminal'])
 # print(data['vm'])
-print(data['user', 'connects', 'terminal'])
-print(data['terminal', 'connects', 'vm'])
+# print(data['user', 'connects', 'terminal'])
+# print(data['terminal', 'connects', 'vm'])
+print(data["terminal", "used_by", "user"])
+print(data["vm", "accessed_by", "terminal"])
 
 # X, y = [], []
 # for g in all_graphs:
