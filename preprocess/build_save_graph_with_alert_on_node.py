@@ -1,0 +1,144 @@
+import json
+import torch
+from torch_geometric.data import HeteroData
+from typing import List, Dict
+
+LABEL_MAP = {
+    "允许访问": 0,
+    "二次身份认证": 1,
+    "限制访问": 2
+}
+
+def build_graph(sample: Dict) -> List[HeteroData]:
+    """将一个样本字典转换为多个用户子图"""
+    input_data = sample["input"]
+    label_dict = sample["output"]["labels"]
+
+    users = input_data["raw_users"]
+    terminals = input_data["raw_terminals"]
+    vms = input_data["raw_vms"]
+    connections = input_data["connections"]
+
+    terminals_indexed_by_id = {terminal['terminal_id']: terminal for terminal in terminals}
+    vms_indexed_by_id = {vm['vm_id']: vm for vm in vms}
+
+    # 按用户构图
+    user_graphs = []
+    for user in users:
+        u_id = user["user_id"]
+
+        # --- 构造当前用户子图 ---
+        user_feat = [[
+            int(user.get("user_type", 0)),
+            float(user.get("login_total", 0)),
+            float(user.get("login_succeed", 0)),
+            float(user.get("if_login_time_ok", 1)),
+            float(user.get("login_time_bias") or 0.0),
+            float(user.get("login_time_diff") or 0.0),
+            float(user.get("if_ip_allow", 1)),
+            float(user.get("if_area_allow") or 1)
+        ]]
+
+        user_label = [LABEL_MAP[label_dict.get(u_id, "允许访问")]]
+
+        # 获取该用户所有连接。如没有连接，则直接形成只有用户特征的图
+        u_conns = [c for c in connections if c["user_id"] == u_id]
+        if not u_conns:
+            data = HeteroData()
+            data["user"].x = torch.tensor(user_feat, dtype=torch.float)
+            data["user"].y = torch.tensor(user_label, dtype=torch.long)
+            user_graphs.append(data)
+            continue
+        
+        # 根据连接情况，列出参与建图的terminal, vm之id列表，并建立id和张量索引的关系
+        involved_terminal_ids = set(c['terminal_id'] for c in connections)
+        involved_vm_ids = set(c['vm_id'] for c in connections)
+        terminal_id_index_map = {terminal_id: i for i, terminal_id in enumerate(involved_terminal_ids)}
+        vm_id_index_map = {vm_id: i for i, vm_id in enumerate(involved_vm_ids)}
+
+        # 根据上面的id名单正式导入terminal和vm特征
+        # 和原本一样，这里产生索引号和输入特征的顺序都来源于相同的enumerate，因此可以保证顺序相同
+        terminal_feats = []
+        for tid in involved_terminal_ids:
+            t = terminals_indexed_by_id[tid]
+            terminal_feats.append([
+                float(t.get("terminal_type", 1)),
+                float(t.get("user_diff", 1)),
+                float(0)
+            ])
+
+        vm_feats = []
+        for vid in involved_vm_ids:
+            v = vms_indexed_by_id[vid]
+            vm_feats.append([
+                float(v.get("vm_os_allow", 1)),
+                float(v.get("vm_os_version_allow", 1)),
+                float(v.get("cpu", 1)),
+                float(v.get("mem", 1)),
+                float(v.get("vm_connection_user", 0)),
+                float(v.get("vm_login_total") or 0),
+                float(v.get("vm_login_succeed") or 0),
+                float(0)
+            ])
+
+        # terminal ↔ vm 边，直接引入连接的两个特征
+        # 当然首先要把 terminal_id 和 vm_id 转换成输入张量中的 terminal 和 vm 索引号
+        tv_edges = []
+        tv_attrs = []
+        for c in u_conns:
+            t_id, v_id = c["terminal_id"], c["vm_id"]
+            if t_id in terminal_id_index_map and v_id in vm_id_index_map:
+                t_idx = terminal_id_index_map[t_id]
+                v_idx = vm_id_index_map[v_id]
+                tv_edges.append([v_idx, t_idx])
+                tv_attrs.append(float(c.get("online_time") or 0))
+                vm_feats[v_idx][-1] += float(c.get("alert_num") or 0)
+
+        # user ↔ terminal 边（聚合），得到该用户对应不同终端的总连接时间和警报数
+        ut_edge_aggregated_feat = {}
+        for c in u_conns:
+            key = c["terminal_id"]
+            ut_edge_aggregated_feat.setdefault(key, {"online_time": 0, "alert_num": 0})
+            ut_edge_aggregated_feat[key]["online_time"] += float(c.get("online_time") or 0)
+            ut_edge_aggregated_feat[key]["alert_num"] += float(c.get("alert_num") or 0)
+
+        # terminal ↔ vm 边，使用上面聚合出来的“新边”
+        # 当然首先要把 user_id 和 terminal_id 转换成输入张量中的 user 和 terminal 索引号
+        ut_edges = []
+        ut_attrs = []
+        for t_id, feat in ut_edge_aggregated_feat.items():
+            if t_id not in terminal_id_index_map:
+                continue
+            t_idx = terminal_id_index_map[t_id]
+            ut_edges.append([t_idx, 0])  # 用户节点索引为0（单节点）
+            ut_attrs.append(feat["online_time"])
+            terminal_feats[t_idx][-1] += feat["alert_num"]
+
+        # --- 构造图 ---
+        data = HeteroData()
+        data["user"].x = torch.tensor(user_feat, dtype=torch.float)
+        data["user"].y = torch.tensor(user_label, dtype=torch.long)
+        data["terminal"].x = torch.tensor(terminal_feats, dtype=torch.float)
+        data["vm"].x = torch.tensor(vm_feats, dtype=torch.float)
+
+        data["terminal", "used_by", "user"].edge_index = torch.tensor(ut_edges, dtype=torch.long).t().contiguous()
+        data["terminal", "used_by", "user"].edge_attr = torch.tensor(ut_attrs, dtype=torch.float)
+
+        data["vm", "accessed_by", "terminal"].edge_index = torch.tensor(tv_edges, dtype=torch.long).t().contiguous()
+        data["vm", "accessed_by", "terminal"].edge_attr = torch.tensor(tv_attrs, dtype=torch.float)
+
+        user_graphs.append(data)
+
+    return user_graphs
+
+def build_and_save_graph_with_alert_on_node(sample_path: str, save_path: str):
+    with open(sample_path, "r", encoding="utf-8") as f:
+        samples = json.load(f)
+
+    # graphs 是一个样本产生的（涉及多个用户的）图列表，并入 graph_list（全体图列表）之中
+    graphs_list = []
+    for sample in samples:
+        graphs = build_graph(sample)
+        graphs_list.extend(graphs)
+
+    torch.save(graphs_list, save_path)

@@ -1,6 +1,6 @@
 import torch
 
-all_graphs = torch.load("data\\graph\\full_sample.pt")
-data = all_graphs[7]
-save_path = "data\\graph\\toy.pt"
+all_graphs = torch.load("data\\graph\\test.pt")
+data = all_graphs[457]
+save_path = "data\\graph\\toy_alert_on_node.pt"
 torch.save(data, save_path)
