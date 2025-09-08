@@ -19,7 +19,7 @@ def load_graph_dataset(pt_files):
         dataset.extend(data_list)
     return dataset
 
-train_files = ["data/graph/train_samples.pt"]  # 训练数据
+train_files = ["data/graph/train/train_samples.pt"]  # 训练数据
 train_dataset = load_graph_dataset(train_files)
 train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True)
 

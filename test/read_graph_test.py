@@ -15,7 +15,7 @@ import numpy as np
 # all_graphs = torch.load("data\graph\merged_sample_20250816_164358.pt")
 # train_graphs = torch.load("data/graph/train_samples.pt")
 # evaluate_graphs = torch.load("data/graph/test_samples.pt")
-data = torch.load("data/graph/toy_alert_on_node.pt")
+data = torch.load("data/graph/toy/toy_alert_on_node.pt")
 
 # print(f"总样本数: {len(all_graphs)}")
 # print("训练集类别分布:", count_labels(train_graphs))

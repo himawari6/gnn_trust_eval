@@ -3,8 +3,8 @@ from model.model import HeteroTrustGNN
 from model.ablation_model import HeteroTrustGraphProp
 
 # 加载 .pt 文件 (List[HeteroData])
-# data = torch.load("data/graph/toy.pt")
-data = torch.load("data/graph/toy_alert_on_node.pt")
+# data = torch.load("data/graph/toy/toy.pt")
+data = torch.load("data/graph/toy/toy_alert_on_node.pt")
 
 # model = HeteroTrustGNN()
 # model.eval()

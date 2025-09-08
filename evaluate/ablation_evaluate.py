@@ -15,7 +15,7 @@ def load_graph_dataset(pt_files):
         dataset.extend(data_list)
     return dataset
 
-test_files = ["data/graph/evaluate_samples_alert_on_node.pt"]  # 测试数据
+test_files = ["data/graph/evaluate/evaluate_samples_alert_on_node.pt"]  # 测试数据
 test_dataset = load_graph_dataset(test_files)
 test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 
