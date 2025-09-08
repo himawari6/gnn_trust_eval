@@ -11,20 +11,16 @@ class VMToTerminalLayer(MessagePassing):
         super().__init__(aggr='add')  # 聚合方式是 sum，加权后就是加权和
 
     def forward(self, x, edge_index, edge_attr):
-        print(edge_attr)
         normed_login_time = torch.log1p(edge_attr) # 得到的是个张量，应该是所有边的log(1+连接时间)
-        print(normed_login_time)
         vm_idx, terminal_idx = edge_index
         denominators = scatter(normed_login_time, terminal_idx, reduce='sum')
         weight = normed_login_time / (denominators[terminal_idx] + 1e-8)
         return self.propagate(edge_index=edge_index, x=x, edge_weight=weight)
     
     def message(self, x_j, edge_weight):
-        print(x_j, edge_weight.view(-1, 1))
         return edge_weight.view(-1, 1) * x_j
     
     def update(self, aggr_out, x):
-        print(x[0].shape, x[1].shape, aggr_out.shape, (x[1] + aggr_out).shape)
         vm_scores, terminal_scores = x
         return terminal_scores + aggr_out
     
@@ -43,7 +39,6 @@ class TerminalToUserLayer(MessagePassing):
         return edge_weight.view(-1, 1) * x_j
     
     def update(self, aggr_out, x):
-        # print(x[0].shape, x[1].shape, aggr_out.shape, (x[1] + aggr_out).shape)
         terminal_scores, user_score = x
         return user_score + aggr_out
     

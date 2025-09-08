@@ -3,7 +3,7 @@ import random
 
 random.seed('?')
 
-dataset_path = 'data\\graph\\full_sample.pt'
+dataset_path = 'data\\graph\\full_sample_alert_on_node.pt'
 
 data_list = torch.load(dataset_path)
 
@@ -21,5 +21,5 @@ test_data = [data_list[i] for i in test_idx]
 
 print(f"训练集: {len(train_data)}, 测试集: {len(test_data)}")
 
-torch.save(train_data, "data\\graph\\train_samples_edge_modified.pt")
-torch.save(test_data, "data\\graph\\evaluate_samples_edge_modified.pt")
+torch.save(train_data, "data\\graph\\train_samples_alert_on_node.pt")
+torch.save(test_data, "data\\graph\\evaluate_samples_alert_on_node.pt")
