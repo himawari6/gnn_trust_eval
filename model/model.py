@@ -8,15 +8,21 @@ from model.modules import VMToTerminalLayer, TerminalToUserLayer
 class HeteroTrustGNN(nn.Module):
     def __init__(self,
                  vm_in_dim=7, term_in_dim=2, user_in_dim=8,
-                 edge_dim=2, user_hidden_dim=8, terminal_hidden_dim=8, vm_hidden_dim=8,
+                 edge_dim=2, user_hidden_dim=32, terminal_hidden_dim=8, vm_hidden_dim=32,
                  num_layers=2, num_classes=3):
         super().__init__()
         self.num_layers = num_layers
 
         # 投影层
-        self.vm_proj = nn.Linear(vm_in_dim, vm_hidden_dim)
-        self.term_proj = nn.Linear(term_in_dim, terminal_hidden_dim)
-        self.user_proj = nn.Linear(user_in_dim, user_hidden_dim)
+        self.vm_proj = nn.Sequential(
+            nn.Linear(vm_in_dim, vm_hidden_dim),
+        )
+        self.term_proj = nn.Sequential(
+            nn.Linear(term_in_dim, terminal_hidden_dim),
+        )
+        self.user_proj = nn.Sequential(
+            nn.Linear(user_in_dim, user_hidden_dim),
+        )
 
         # 构造多层 HeteroConv
         self.layers = nn.ModuleList()
@@ -50,11 +56,9 @@ class HeteroTrustGNN(nn.Module):
         edge_attr = data.edge_attr_dict
 
         # 逐层 HeteroConv
-        # print(x_dict)
         for conv in self.layers:
             updated_x = conv(x, edge_index, edge_attr)
             x = {**x, **updated_x}
-            # print(x_dict)
 
         # 基于 user 节点分类
         out = self.classifier(x['user'])
