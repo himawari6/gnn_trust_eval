@@ -63,8 +63,7 @@ def build_graph(sample: Dict) -> List[HeteroData]:
             t = terminals_indexed_by_id[tid]
             terminal_feats.append([
                 float(t.get("terminal_type", 1)),
-                float(t.get("user_diff", 1)),
-                float(0)
+                float(t.get("user_diff", 1))
             ])
 
         vm_feats = []
@@ -77,8 +76,7 @@ def build_graph(sample: Dict) -> List[HeteroData]:
                 float(v.get("mem", 1)),
                 float(v.get("vm_connection_user", 0)),
                 float(v.get("vm_login_total") or 0),
-                float(v.get("vm_login_succeed") or 0),
-                float(0)
+                float(v.get("vm_login_succeed") or 0)
             ])
 
         # terminal ↔ vm 边，直接引入连接的两个特征
@@ -91,8 +89,7 @@ def build_graph(sample: Dict) -> List[HeteroData]:
                 t_idx = terminal_id_index_map[t_id]
                 v_idx = vm_id_index_map[v_id]
                 tv_edges.append([v_idx, t_idx])
-                tv_attrs.append(float(c.get("online_time") or 0))
-                vm_feats[v_idx][-1] += float(c.get("alert_num") or 0)
+                tv_attrs.append([float(c.get("online_time") or 0), float(c.get("alert_num") or 0)])
 
         # user ↔ terminal 边（聚合），得到该用户对应不同终端的总连接时间和警报数
         ut_edge_aggregated_feat = {}
@@ -102,7 +99,7 @@ def build_graph(sample: Dict) -> List[HeteroData]:
             ut_edge_aggregated_feat[key]["online_time"] += float(c.get("online_time") or 0)
             ut_edge_aggregated_feat[key]["alert_num"] += float(c.get("alert_num") or 0)
 
-        # terminal ↔ vm 边，使用上面聚合出来的“新边”
+        # user ↔ terminal 边，使用上面聚合出来的“新边”
         # 当然首先要把 user_id 和 terminal_id 转换成输入张量中的 user 和 terminal 索引号
         ut_edges = []
         ut_attrs = []
@@ -111,8 +108,25 @@ def build_graph(sample: Dict) -> List[HeteroData]:
                 continue
             t_idx = terminal_id_index_map[t_id]
             ut_edges.append([t_idx, 0])  # 用户节点索引为0（单节点）
-            ut_attrs.append(feat["online_time"])
-            terminal_feats[t_idx][-1] += feat["alert_num"]
+            ut_attrs.append([feat["online_time"], feat["alert_num"]])
+
+        # user ↔ vm 边（聚合），得到该用户对应不同虚拟机的总连接时间和警报数，以虚拟机vm_id为索引
+        uv_edge_aggregated_feat = {}
+        for c in u_conns:
+            key = c["vm_id"]
+            uv_edge_aggregated_feat.setdefault(key, {"online_time": 0, "alert_num": 0})
+            uv_edge_aggregated_feat[key]["online_time"] += float(c.get("online_time") or 0)
+            uv_edge_aggregated_feat[key]["alert_num"] += float(c.get("alert_num") or 0)
+
+        # user ↔ vm 边，使用上面聚合出来的“新边”
+        uv_edges = []
+        uv_attrs = []
+        for v_id, feat in uv_edge_aggregated_feat.items():
+            if v_id not in vm_id_index_map:
+                continue
+            v_idx = vm_id_index_map[v_id]
+            uv_edges.append([v_idx, 0])  # 用户节点索引为0（单节点）
+            uv_attrs.append([feat["online_time"], feat["alert_num"]])
 
         # --- 构造图 ---
         data = HeteroData()
@@ -127,11 +141,14 @@ def build_graph(sample: Dict) -> List[HeteroData]:
         data["vm", "accessed_by", "terminal"].edge_index = torch.tensor(tv_edges, dtype=torch.long).t().contiguous()
         data["vm", "accessed_by", "terminal"].edge_attr = torch.tensor(tv_attrs, dtype=torch.float)
 
+        data["vm", "employed_by", "user"].edge_index = torch.tensor(uv_edges, dtype=torch.long).t().contiguous()
+        data["vm", "employed_by", "user"].edge_attr = torch.tensor(uv_attrs, dtype=torch.float)
+
         user_graphs.append(data)
 
     return user_graphs
 
-def build_and_save_graph_with_alert_on_node(sample_path: str, save_path: str):
+def build_and_save_graph_with_vm2user_edge(sample_path: str, save_path: str):
     with open(sample_path, "r", encoding="utf-8") as f:
         samples = json.load(f)
 

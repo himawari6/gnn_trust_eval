@@ -28,7 +28,7 @@ def build_graph(sample: Dict) -> List[HeteroData]:
         u_id = user["user_id"]
 
         # --- 构造当前用户子图 ---
-        user_feat = torch.tensor([[
+        user_feat = [[
             int(user.get("user_type", 0)),
             float(user.get("login_total", 0)),
             float(user.get("login_succeed", 0)),
@@ -36,17 +36,17 @@ def build_graph(sample: Dict) -> List[HeteroData]:
             float(user.get("login_time_bias") or 0.0),
             float(user.get("login_time_diff") or 0.0),
             float(user.get("if_ip_allow", 1)),
-            float(user.get("if_area_allow") or 1),
-        ]], dtype=torch.float)
+            float(user.get("if_area_allow") or 1)
+        ]]
 
-        user_label = torch.tensor([LABEL_MAP[label_dict.get(u_id, "允许访问")]], dtype=torch.long)
+        user_label = [LABEL_MAP[label_dict.get(u_id, "允许访问")]]
 
         # 获取该用户所有连接。如没有连接，则直接形成只有用户特征的图
         u_conns = [c for c in connections if c["user_id"] == u_id]
         if not u_conns:
             data = HeteroData()
-            data["user"].x = user_feat
-            data["user"].y = user_label
+            data["user"].x = torch.tensor(user_feat, dtype=torch.float)
+            data["user"].y = torch.tensor(user_label, dtype=torch.long)
             user_graphs.append(data)
             continue
         
@@ -64,8 +64,8 @@ def build_graph(sample: Dict) -> List[HeteroData]:
             terminal_feats.append([
                 float(t.get("terminal_type", 1)),
                 float(t.get("user_diff", 1)),
+                float(0)
             ])
-        terminal_x = torch.tensor(terminal_feats, dtype=torch.float)
 
         vm_feats = []
         for vid in involved_vm_ids:
@@ -78,8 +78,8 @@ def build_graph(sample: Dict) -> List[HeteroData]:
                 float(v.get("vm_connection_user", 0)),
                 float(v.get("vm_login_total") or 0),
                 float(v.get("vm_login_succeed") or 0),
+                float(0)
             ])
-        vm_x = torch.tensor(vm_feats, dtype=torch.float)
 
         # terminal ↔ vm 边，直接引入连接的两个特征
         # 当然首先要把 terminal_id 和 vm_id 转换成输入张量中的 terminal 和 vm 索引号
@@ -91,7 +91,8 @@ def build_graph(sample: Dict) -> List[HeteroData]:
                 t_idx = terminal_id_index_map[t_id]
                 v_idx = vm_id_index_map[v_id]
                 tv_edges.append([v_idx, t_idx])
-                tv_attrs.append([float(c.get("online_time") or 0), float(c.get("alert_num") or 0)])
+                tv_attrs.append(float(c.get("online_time") or 0))
+                vm_feats[v_idx][-1] += float(c.get("alert_num") or 0)
 
         # user ↔ terminal 边（聚合），得到该用户对应不同终端的总连接时间和警报数
         ut_edge_aggregated_feat = {}
@@ -110,20 +111,15 @@ def build_graph(sample: Dict) -> List[HeteroData]:
                 continue
             t_idx = terminal_id_index_map[t_id]
             ut_edges.append([t_idx, 0])  # 用户节点索引为0（单节点）
-            ut_attrs.append([feat["online_time"], feat["alert_num"]])
+            ut_attrs.append(feat["online_time"])
+            terminal_feats[t_idx][-1] += feat["alert_num"]
 
         # --- 构造图 ---
         data = HeteroData()
-        data["user"].x = user_feat
-        data["user"].y = user_label
-        data["terminal"].x = terminal_x
-        data["vm"].x = vm_x
-
-        # data["user", "connects", "terminal"].edge_index = torch.tensor(ut_edges, dtype=torch.long).t().contiguous()
-        # data["user", "connects", "terminal"].edge_attr = torch.tensor(ut_attrs, dtype=torch.float)
-
-        # data["terminal", "connects", "vm"].edge_index = torch.tensor(tv_edges, dtype=torch.long).t().contiguous()
-        # data["terminal", "connects", "vm"].edge_attr = torch.tensor(tv_attrs, dtype=torch.float)
+        data["user"].x = torch.tensor(user_feat, dtype=torch.float)
+        data["user"].y = torch.tensor(user_label, dtype=torch.long)
+        data["terminal"].x = torch.tensor(terminal_feats, dtype=torch.float)
+        data["vm"].x = torch.tensor(vm_feats, dtype=torch.float)
 
         data["terminal", "used_by", "user"].edge_index = torch.tensor(ut_edges, dtype=torch.long).t().contiguous()
         data["terminal", "used_by", "user"].edge_attr = torch.tensor(ut_attrs, dtype=torch.float)
@@ -135,7 +131,7 @@ def build_graph(sample: Dict) -> List[HeteroData]:
 
     return user_graphs
 
-def build_and_save_graph(sample_path: str, save_path: str):
+def build_and_save_graph_with_alert_on_node(sample_path: str, save_path: str):
     with open(sample_path, "r", encoding="utf-8") as f:
         samples = json.load(f)
 
