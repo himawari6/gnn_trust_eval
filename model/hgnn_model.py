@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch_geometric.nn import HeteroConv
 from torch_geometric.data import HeteroData
-from model.modules import VMToTerminalLayer, TerminalToUserLayer, VMToUserLayer
+from model.hgnn_modules import VMToTerminalLayer, TerminalToUserLayer, VMToUserLayer
 
 
 class HeteroTrustGNN(nn.Module):

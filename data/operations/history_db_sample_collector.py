@@ -1,7 +1,7 @@
 import pymysql
 import json
 from datetime import datetime, timedelta
-from config.config import DB_CONFIG
+from config.db_config import DB_CONFIG
 
 USER_BATCH_SIZE = 3
 TERM_BATCH_SIZE = 2

@@ -1,75 +1,140 @@
+import os
+import argparse
+
 import torch
 from torch_geometric.loader import DataLoader
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, classification_report
-from model.model import HeteroTrustGNN  # 你的模型
-import os
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    classification_report
+)
+
+from model.hgnn_model import HeteroTrustGNN
 from utils.logger import get_logger
+from config.ablation_config import ABLATION_CONFIGS
+
 
 # ---------------------------
-# 加载数据
+# 数据加载
 # ---------------------------
 def load_graph_dataset(pt_files):
     dataset = []
     for file in pt_files:
-        data_list = torch.load(file)  # List[HeteroData]
+        data_list = torch.load(file)
         dataset.extend(data_list)
     return dataset
 
-test_files = ["data/graph/evaluate/evaluate_samples.pt"]  # 测试数据
-test_dataset = load_graph_dataset(test_files)
-test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
-
-logger = get_logger(log_dir="log", log_name="GNN_evaluate")
 
 # ---------------------------
-# 初始化模型并加载权重
+# 评估函数
 # ---------------------------
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-model = HeteroTrustGNN(
-    vm_in_dim=7,
-    term_in_dim=2,
-    user_in_dim=8,
-    edge_dim=2,
-    user_hidden_dim=32,
-    terminal_hidden_dim=8,
-    vm_hidden_dim=32,
-    num_layers=2,
-    num_classes=3
-).to(device)
+def evaluate(model, dataloader, device):
+    all_preds = []
+    all_labels = []
 
-model_path = "result\\train\\model\\trust_gnn_model20250909_174512.pth"
-if not os.path.exists(model_path):
-    raise FileNotFoundError(f"找不到模型文件 {model_path}，请先运行 train.py")
+    model.eval()
+    with torch.no_grad():
+        for data in dataloader:
+            data = data.to(device)
+            out = model(data)
 
-model.load_state_dict(torch.load(model_path, map_location=device))
-model.eval()
+            preds = out.argmax(dim=1).cpu().numpy()
+            labels = data["user"].y.cpu().numpy()
+
+            all_preds.extend(preds)
+            all_labels.extend(labels)
+
+    return all_labels, all_preds
+
 
 # ---------------------------
-# 测试
+# 主入口
 # ---------------------------
-all_preds = []
-all_labels = []
+def main():
+    parser = argparse.ArgumentParser(description="Evaluate HeteroTrustGNN")
+    parser.add_argument(
+        "--mode",
+        type=str,
+        required=True,
+        choices=ABLATION_CONFIGS.keys()
+    )
+    parser.add_argument(
+        "--model-path",
+        type=str,
+        required=True,
+        help="Path to trained model (.pth)"
+    )
+    args = parser.parse_args()
 
-with torch.no_grad():
-    for data in test_loader:
-        data = data.to(device)
-        out = model(data)
-        preds = out.argmax(dim=1).cpu().numpy()
-        labels = data["user"].y.cpu().numpy()
+    cfg = ABLATION_CONFIGS[args.mode]
 
-        all_preds.extend(preds)
-        all_labels.extend(labels)
+    logger = get_logger(
+        log_dir="log",
+        log_name=f"GNN_evaluate_{cfg.tag}"
+    )
 
-acc = accuracy_score(all_labels, all_preds)
-precision = precision_score(all_labels, all_preds, average='macro', zero_division=0)
-recall = recall_score(all_labels, all_preds, average='macro', zero_division=0)
-f1 = f1_score(all_labels, all_preds, average='macro', zero_division=0)
+    logger.info(f"开始评估，消融模式：{cfg.tag}")
+    logger.info(f"模型路径：{args.model_path}")
 
-logger.info(f'模型：{model_path}')
-logger.info(
-    f"Accuracy: {acc:.4f}, "
-    f"Precision: {precision:.4f}, "
-    f"Recall: {recall:.4f}, "
-    f"F1-score: {f1:.4f}"
-)
-logger.info('\n' + classification_report(all_labels, all_preds, digits=4, zero_division=0))
+    # ---------------------------
+    # 数据
+    # ---------------------------
+    if cfg.use_vm2user_edge:
+        test_files = ["data/graph/evaluate/evaluate_samples_with_vm2user_edge.pt"]
+    else:
+        test_files = ["data/graph/evaluate/evaluate_samples.pt"]
+
+    test_dataset = load_graph_dataset(test_files)
+    test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
+
+    # ---------------------------
+    # 模型
+    # ---------------------------
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    model = HeteroTrustGNN(
+        vm_in_dim=7,
+        term_in_dim=2,
+        user_in_dim=8,
+        edge_dim=2,
+        user_hidden_dim=32,
+        terminal_hidden_dim=8,
+        vm_hidden_dim=32,
+        num_layers=2,
+        num_classes=3,
+        mode=cfg.mode
+    ).to(device)
+
+    if not os.path.exists(args.model_path):
+        raise FileNotFoundError(f"模型文件不存在：{args.model_path}")
+
+    model.load_state_dict(torch.load(args.model_path, map_location=device))
+
+    # ---------------------------
+    # 评估
+    # ---------------------------
+    labels, preds = evaluate(model, test_loader, device)
+
+    acc = accuracy_score(labels, preds)
+    precision = precision_score(labels, preds, average="macro", zero_division=0)
+    recall = recall_score(labels, preds, average="macro", zero_division=0)
+    f1 = f1_score(labels, preds, average="macro", zero_division=0)
+
+    logger.info(
+        f"Accuracy: {acc:.4f} | "
+        f"Precision: {precision:.4f} | "
+        f"Recall: {recall:.4f} | "
+        f"F1: {f1:.4f}"
+    )
+
+    logger.info(
+        "\n" + classification_report(
+            labels, preds, digits=4, zero_division=0
+        )
+    )
+
+
+if __name__ == "__main__":
+    main()

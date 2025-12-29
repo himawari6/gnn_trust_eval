@@ -1,7 +1,7 @@
 import pymysql
 import json
 from datetime import datetime
-from config.config import DB_CONFIG
+from config.db_config import DB_CONFIG
 
 def get_features_from_db():
     conn = pymysql.connect(**DB_CONFIG)
