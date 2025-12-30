@@ -7,7 +7,10 @@ import torch.nn as nn
 import torch.optim as optim
 from torch_geometric.loader import DataLoader
 from torch.optim.lr_scheduler import ExponentialLR
+import numpy as np
 import matplotlib.pyplot as plt
+
+# from sklearn.utils.class_weight import compute_class_weight
 
 from model.hgnn_model import HeteroTrustGNN
 from utils.logger import get_logger
@@ -22,6 +25,22 @@ def load_graph_dataset(pt_files):
         data_list = torch.load(file)
         dataset.extend(data_list)
     return dataset
+
+# 数据集信息统计
+def compute_class_weight(dataset, num_classes):
+    counts = torch.zeros(num_classes)
+
+    for data in dataset:
+        label = data["user"].y.item()
+        counts[label] += 1
+
+    # 避免除 0
+    counts = torch.clamp(counts, min=1)
+
+    weights = counts.sum() / counts
+    weights = weights / weights.mean()  # 归一化，避免数值过大
+
+    return weights
 
 # ---------------------------
 # 训练函数
@@ -102,6 +121,13 @@ def main():
         choices=ABLATION_CONFIGS.keys(),
         help="Ablation mode"
     )
+    parser.add_argument(
+        "--loss",
+        type=str,
+        default="ce",
+        choices=["ce", "weighted_ce"],
+        help="Loss function type"
+    )
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--lr", type=float, default=1e-3)
     args = parser.parse_args()
@@ -149,7 +175,13 @@ def main():
         mode=cfg.mode
     ).to(device)
 
-    criterion = nn.CrossEntropyLoss()
+    if args.loss == "weighted_ce":
+        class_weights = compute_class_weight(train_dataset, num_classes=3)
+        class_weights = class_weights.to(device)
+        logger.info(f"Using weighted CE, weights={class_weights.tolist()}")
+        criterion = nn.CrossEntropyLoss(weight=class_weights)
+    else:
+        criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=1e-5)
     scheduler = ExponentialLR(optimizer, gamma=0.95)
 
@@ -165,7 +197,7 @@ def main():
         device=device,
         logger=logger,
         num_epochs=args.epochs,
-        save_tag=cfg.tag
+        save_tag=f"{cfg.tag}_{args.loss}"
     )
 
 
