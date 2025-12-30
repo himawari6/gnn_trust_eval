@@ -18,6 +18,10 @@ class HomoTrustGNN_GraphSAGE(nn.Module):
         self.num_layers = num_layers
         # self.dropout = dropout
 
+        self.proj = nn.Sequential(
+            nn.Linear(in_dim, hidden_dim)
+        )
+
         # ---------- GNN layers ----------
         self.convs = nn.ModuleList()
         self.convs.append(SAGEConv(in_dim, hidden_dim))
@@ -42,6 +46,10 @@ class HomoTrustGNN_GraphSAGE(nn.Module):
           - user_mask
         """
         x, edge_index = data.x, data.edge_index
+        if edge_index is None:
+            user_x = x[data.user_mask]
+            user_x = self.proj(user_x)
+            return self.classifier(user_x)
 
         # ----- GNN propagation -----
         for conv in self.convs:

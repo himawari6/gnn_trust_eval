@@ -17,6 +17,12 @@ class HomoTrustGNN_GCN(nn.Module):
 
         self.num_layers = num_layers
         # self.dropout = dropout
+        
+        # 由于建图那个convert_hetero_to_homo的bug，
+        # 对于只有一种节点的图只加了一位的one-hot类型标签，因此不得不单独处理一下
+        self.proj = nn.Sequential(
+            nn.Linear(in_dim, hidden_dim)
+        )
 
         # ---------- GNN layers ----------
         self.convs = nn.ModuleList()
@@ -42,6 +48,10 @@ class HomoTrustGNN_GCN(nn.Module):
           - user_mask
         """
         x, edge_index = data.x, data.edge_index
+        if edge_index is None:
+            user_x = x[data.user_mask]
+            user_x = self.proj(user_x)
+            return self.classifier(user_x)
 
         # ----- GNN propagation -----
         for conv in self.convs:

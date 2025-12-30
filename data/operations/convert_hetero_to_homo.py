@@ -3,10 +3,16 @@ import torch
 from torch_geometric.data import HeteroData, Data
 from typing import List
 
+NODE_TYPE_MAP = {
+    'user': 0,
+    'terminal': 1,
+    'vm': 2
+}
 
 def hetero_list_to_homo_list(
     hetero_list: List[HeteroData],
-    add_type_onehot: bool = True
+    add_type_onehot: bool = True,
+    type_num = len(NODE_TYPE_MAP)
 ) -> List[Data]:
     """
     将 List[HeteroData] 转换为 List[Data]（同构图）
@@ -20,19 +26,27 @@ def hetero_list_to_homo_list(
     """
 
     homo_list = []
+    node_types = NODE_TYPE_MAP.keys()
 
     for hetero in hetero_list:
         # 1. 转为同构图
         homo = hetero.to_homogeneous()
+        assert 'user' in hetero.node_types, "HeteroData 中必须包含 user 节点"
 
-        # 2. 确定 user 类型 index
-        node_types = hetero.node_types
-        assert 'user' in node_types, "HeteroData 中必须包含 user 节点"
-
-        user_type_idx = node_types.index('user')
+        # 2. 生成指示每个节点类型的node_type_idx数组
+        node_type_idx = torch.empty_like(homo.node_type)
+        for name, idx in NODE_TYPE_MAP.items():
+            # 获取在该图中，to_homo给该类型自动映射到了什么数值，记为该类型的本地映射
+            # 如果该图中不存在这一节点类型，就把本地映射记成-1
+            local_idx = hetero.node_types.index(name) if name in hetero.node_types else -1
+            # 把所有的本地映射值替换为全局映射
+            # if指的是“该类型的本地映射不是-1，所以该图中存在这一节点类型”
+            # 中括号里是布尔批量索引，能指示出全部的应修改位置
+            if local_idx >= 0: 
+                node_type_idx[homo.node_type == local_idx] = idx
 
         # 3. 构造 user_mask
-        user_mask = (homo.node_type == user_type_idx)
+        user_mask = (homo.node_type == NODE_TYPE_MAP['user'])
         homo.user_mask = user_mask
 
         # 4. 构造 y（对齐到所有节点，首先将所有节点的y设为-1）
@@ -47,10 +61,9 @@ def hetero_list_to_homo_list(
 
         # 5. 添加节点类型 one-hot
         if add_type_onehot:
-            num_types = len(node_types)
             type_onehot = torch.nn.functional.one_hot(
-                homo.node_type,
-                num_classes=num_types
+                node_type_idx,
+                num_classes=type_num
             ).float()
             homo.x = torch.cat([homo.x, type_onehot], dim=1)
 
@@ -93,7 +106,6 @@ def convert_pt_file(
 
 
 if __name__ == "__main__":
-    # 示例用法
     convert_pt_file(
         input_pt_path="data/graph/evaluate/evaluate_samples.pt",
         output_pt_path="data/graph/evaluate/evaluate_samples_homo.pt",
