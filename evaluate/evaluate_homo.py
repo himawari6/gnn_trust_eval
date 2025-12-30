@@ -13,6 +13,7 @@ from sklearn.metrics import (
 
 from model.gcn_model import HomoTrustGNN_GCN
 from model.graphsage_model import HomoTrustGNN_GraphSAGE
+from model.gat_model import HomoTrustGNN_GAT
 from utils.logger import get_logger
 
 # ---------------------------
@@ -30,6 +31,8 @@ def build_homognn_model(model_type: str, node_dim: int):
         return HomoTrustGNN_GCN(in_dim=node_dim)
     elif model_type == 'sage':
         return HomoTrustGNN_GraphSAGE(in_dim=node_dim)
+    elif model_type == 'gat':
+        return HomoTrustGNN_GAT(in_dim=node_dim)
     else:
         raise ValueError(f"Unknown MODEL_TYPE: {model_type}")
     
@@ -57,7 +60,7 @@ def main():
         "--model",
         type=str,
         required=True,
-        choices=['gcn', 'sage'],
+        choices=['gcn', 'sage', 'gat'],
         help="choose_homo_model"
     )
     parser.add_argument(
